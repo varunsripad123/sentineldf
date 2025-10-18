@@ -62,6 +62,16 @@ class APIKey(Base):
     name = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class UsageLog(Base):
+    __tablename__ = "usage_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    api_key = Column(String, index=True)
+    documents_scanned = Column(Integer)
+    quarantined_count = Column(Integer)
+    max_risk = Column(Integer)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -288,22 +298,47 @@ async def get_my_keys(
     ]
 
 @app.get("/v1/keys/usage")
-async def get_usage(authorization: Optional[str] = Header(None)):
-    """Get usage statistics."""
+async def get_usage(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    """Get usage statistics from database."""
+    # Extract API key from authorization header
+    api_key = None
+    if authorization and authorization.startswith("Bearer "):
+        api_key = authorization.replace("Bearer ", "")
+    
+    # Query usage logs
+    if api_key:
+        logs = db.query(UsageLog).filter(UsageLog.api_key == api_key).all()
+    else:
+        logs = db.query(UsageLog).all()
+    
+    # Aggregate statistics
+    total_calls = len(logs)
+    documents_scanned = sum(log.documents_scanned for log in logs)
+    quarantined_total = sum(log.quarantined_count for log in logs)
+    
     return {
-        "total_calls": 0,
-        "documents_scanned": 0,
-        "tokens_used": 0,
-        "cost_dollars": 0.00,
-        "quota_remaining": 1000
+        "total_calls": total_calls,
+        "documents_scanned": documents_scanned,
+        "quarantined_documents": quarantined_total,
+        "cost_dollars": 0.00,  # Free for now
+        "quota_remaining": 10000 - documents_scanned
     }
 
 @app.post("/v1/scan", response_model=ScanResponse)
 async def scan_texts(
     request: ScanRequest,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
 ):
     """Scan documents for threats using ML models."""
+    
+    # Extract API key for logging
+    api_key = None
+    if authorization and authorization.startswith("Bearer "):
+        api_key = authorization.replace("Bearer ", "")
     
     # Load ML models on first scan
     model, detector, _ = get_ml_models()
@@ -345,6 +380,17 @@ async def scan_texts(
     avg_risk = sum(r.risk for r in results) / total if total > 0 else 0
     max_risk = max((r.risk for r in results), default=0)
     batch_id = f"batch_{secrets.token_hex(8)}"
+    
+    # Log usage to database
+    if api_key:
+        usage_log = UsageLog(
+            api_key=api_key,
+            documents_scanned=total,
+            quarantined_count=quarantined,
+            max_risk=max_risk
+        )
+        db.add(usage_log)
+        db.commit()
     
     return ScanResponse(
         results=results,
