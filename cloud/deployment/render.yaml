@@ -1,0 +1,168 @@
+# SentinelDF Cloud - Render Deployment Configuration
+# 
+# This deploys the enterprise architecture alongside your existing api_server.py
+# No conflicts - both can run simultaneously during migration
+
+services:
+  # ==========================================================================
+  # CONTROL PLANE - API Server (Auto-scaled)
+  # ==========================================================================
+  - type: web
+    name: sentineldf-cloud-api
+    env: python
+    region: oregon
+    plan: standard  # Required for auto-scaling
+    buildCommand: pip install -r cloud/config/requirements_cloud.txt
+    startCommand: uvicorn cloud.control_plane.api:app --host 0.0.0.0 --port $PORT --workers 4
+    
+    # Auto-scaling configuration
+    scaling:
+      minInstances: 2  # Always have 2 for HA
+      maxInstances: 50  # Scale up to 50 under load
+      targetMemoryPercent: 70
+      targetCPUPercent: 70
+    
+    # Health checks
+    healthCheckPath: /health
+    
+    # Environment variables
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: sentineldf-cache
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sentineldf-db
+          property: connectionString
+      - key: S3_BUCKET
+        sync: false  # Set manually in dashboard
+      - key: AWS_REGION
+        value: us-east-1
+      - key: STRIPE_API_KEY
+        sync: false  # Set manually (secret)
+      - key: SENTRY_DSN
+        sync: false  # Set manually
+  
+  # ==========================================================================
+  # DATA PLANE - Celery Workers (Auto-scaled)
+  # ==========================================================================
+  - type: worker
+    name: sentineldf-workers
+    env: python
+    region: oregon
+    plan: standard
+    buildCommand: pip install -r cloud/config/requirements_cloud.txt
+    startCommand: celery -A cloud.data_plane.worker worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000
+    
+    # Auto-scaling based on queue depth
+    scaling:
+      minInstances: 5  # Always have 5 workers ready
+      maxInstances: 500  # Scale to 500 under heavy load
+      targetQueueDepth: 100  # Add worker when queue > 100 jobs
+    
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: sentineldf-queue
+          property: connectionString
+      - key: S3_BUCKET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+  
+  # ==========================================================================
+  # LEGACY API - Keep running during migration
+  # ==========================================================================
+  - type: web
+    name: sentineldf-api-legacy
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: pip install fastapi==0.104.1 uvicorn[standard]==0.24.0 pydantic==2.5.0
+    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    
+    envVars:
+      - key: ENVIRONMENT
+        value: production-legacy
+
+# ==========================================================================
+# DATABASES
+# ==========================================================================
+databases:
+  - name: sentineldf-db
+    databaseName: sentineldf_prod
+    user: sentineldf_user
+    plan: standard  # 4 GB RAM, 80 GB storage
+    region: oregon
+    
+    # Enable read replicas for analytics queries
+    readReplicas:
+      - region: oregon
+        plan: starter
+
+# ==========================================================================
+# REDIS INSTANCES
+# ==========================================================================
+redis:
+  # Cache instance (API keys, embeddings, rate limits)
+  - name: sentineldf-cache
+    plan: standard  # 1 GB RAM
+    region: oregon
+    maxmemoryPolicy: allkeys-lru  # Evict least recently used
+    
+  # Queue instance (Celery job queue)
+  - name: sentineldf-queue
+    plan: standard  # 1 GB RAM
+    region: oregon
+    maxmemoryPolicy: noeviction  # Never evict job queue data
+
+# ==========================================================================
+# CRON JOBS
+# ==========================================================================
+cronjobs:
+  # Nightly usage rollup (Redis → Postgres)
+  - name: usage-rollup
+    schedule: "0 2 * * *"  # 2 AM daily
+    command: python cloud/scripts/rollup_usage.py
+    
+  # Clean up old job records
+  - name: cleanup-jobs
+    schedule: "0 3 * * *"  # 3 AM daily
+    command: python cloud/scripts/cleanup_old_jobs.py
+    
+  # Sync billing with Stripe
+  - name: sync-billing
+    schedule: "0 1 * * *"  # 1 AM daily
+    command: python cloud/scripts/sync_stripe_billing.py
+
+# ==========================================================================
+# NOTES
+# ==========================================================================
+# 
+# Cost Estimate (at scale):
+# - API servers (2-10 instances): $150-750/month
+# - Workers (5-100 instances): $350-7,000/month
+# - Postgres Standard: $50/month
+# - Redis (2x Standard): $100/month
+# - Total: ~$650-8,000/month (scales with usage)
+#
+# Performance:
+# - API P99 latency: <250ms
+# - Worker throughput: 1000+ docs/min per worker
+# - Scale to 50M+ docs/day
+#
+# High Availability:
+# - Multi-instance API (automatic failover)
+# - Worker redundancy (jobs retry on failure)
+# - Database backups (daily, 7-day retention)
