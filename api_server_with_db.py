@@ -72,19 +72,33 @@ class APIKeyResponse(BaseModel):
     key_id: int
     key_prefix: str
 
+class Document(BaseModel):
+    id: str
+    content: str
+    metadata: Optional[dict] = None
+
 class ScanRequest(BaseModel):
-    texts: list[str]
+    docs: list[Document]
+    page: Optional[int] = 1
+    page_size: Optional[int] = 100
 
 class ScanResult(BaseModel):
-    text_id: int
+    doc_id: str
     risk: int
     quarantine: bool
     reasons: list[str]
     action: str
     signals: dict
 
+class ScanSummary(BaseModel):
+    total_scanned: int
+    safe_count: int
+    quarantined_count: int
+    avg_risk: float
+
 class ScanResponse(BaseModel):
     results: list[ScanResult]
+    summary: ScanSummary
 
 # ============================================================================
 # ENDPOINTS
@@ -167,7 +181,7 @@ async def scan_texts(
     request: ScanRequest,
     authorization: Optional[str] = Header(None)
 ):
-    """Scan texts for threats (keyword-based)."""
+    """Scan documents for threats (keyword-based)."""
     results = []
     
     threat_keywords = [
@@ -175,14 +189,14 @@ async def scan_texts(
         "forget previous", "reveal", "bypass", "override", "sudo"
     ]
     
-    for i, text in enumerate(request.texts):
-        text_lower = text.lower()
+    for doc in request.docs:
+        text_lower = doc.content.lower()
         detected_threats = [kw for kw in threat_keywords if kw in text_lower]
         risk_score = min(100, len(detected_threats) * 35)
         is_threat = risk_score >= 70
         
         results.append(ScanResult(
-            text_id=i,
+            doc_id=doc.id,
             risk=risk_score,
             quarantine=is_threat,
             reasons=[f"Detected: {kw}" for kw in detected_threats] if detected_threats else [],
@@ -190,7 +204,21 @@ async def scan_texts(
             signals={"heuristic": risk_score / 100.0, "embedding": 0.0}
         ))
     
-    return ScanResponse(results=results)
+    # Calculate summary
+    total = len(results)
+    quarantined = sum(1 for r in results if r.quarantine)
+    safe = total - quarantined
+    avg_risk = sum(r.risk for r in results) / total if total > 0 else 0
+    
+    return ScanResponse(
+        results=results,
+        summary=ScanSummary(
+            total_scanned=total,
+            safe_count=safe,
+            quarantined_count=quarantined,
+            avg_risk=avg_risk
+        )
+    )
 
 if __name__ == "__main__":
     import uvicorn
