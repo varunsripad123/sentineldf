@@ -53,17 +53,17 @@ async def health():
 
 @app.post("/v1/keys/create", response_model=APIKeyResponse)
 async def create_api_key(
-    request: CreateKeyRequest,
+    name: str = "Dashboard Key",
     authorization: Optional[str] = Header(None)
 ):
-    """Create a new API key."""
+    """Create a new API key. Accepts name as query parameter."""
     api_key = f"sk_live_{secrets.token_urlsafe(32)}"
     key_id = len(api_keys_db) + 1
     key_prefix = api_key[:15] + "..."
     
     api_keys_db[api_key] = {
         "id": key_id,
-        "name": request.name,
+        "name": name,
         "key_prefix": key_prefix,
         "created_at": datetime.utcnow().isoformat()
     }
