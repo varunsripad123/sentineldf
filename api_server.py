@@ -98,6 +98,62 @@ async def get_usage(authorization: Optional[str] = Header(None)):
         "quota_remaining": 1000
     }
 
+# ============================================================================
+# SCAN ENDPOINTS (Mock for now - replace with real ML later)
+# ============================================================================
+
+class ScanRequest(BaseModel):
+    texts: list[str]
+
+class ScanResult(BaseModel):
+    text_id: int
+    risk: int
+    quarantine: bool
+    reasons: list[str]
+    action: str
+    signals: dict
+
+class ScanResponse(BaseModel):
+    results: list[ScanResult]
+
+@app.post("/v1/scan", response_model=ScanResponse)
+async def scan_texts(
+    request: ScanRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Scan texts for threats (mock implementation).
+    
+    For now, uses simple keyword detection.
+    Replace with real ML models later.
+    """
+    results = []
+    
+    # Simple threat detection keywords
+    threat_keywords = [
+        "jailbreak", "ignore all", "disregard", "unrestricted mode",
+        "forget previous", "reveal", "bypass", "override", "sudo"
+    ]
+    
+    for i, text in enumerate(request.texts):
+        text_lower = text.lower()
+        
+        # Check for threats
+        detected_threats = [kw for kw in threat_keywords if kw in text_lower]
+        risk_score = min(100, len(detected_threats) * 35)
+        is_threat = risk_score >= 70
+        
+        results.append(ScanResult(
+            text_id=i,
+            risk=risk_score,
+            quarantine=is_threat,
+            reasons=[f"Detected: {kw}" for kw in detected_threats] if detected_threats else [],
+            action="quarantine" if is_threat else "allow",
+            signals={"heuristic": risk_score / 100.0, "embedding": 0.0}
+        ))
+    
+    return ScanResponse(results=results)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

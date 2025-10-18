@@ -82,7 +82,7 @@ class SentinelDF:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.sentineldf.com",
+        base_url: str = "https://sentineldf.onrender.com",
         timeout: int = 30
     ):
         """

@@ -22,7 +22,7 @@ class PostInstallCommand(install):
 
 setup(
     name="sentineldf",
-    version="2.0.0",
+    version="2.0.1",
     author="Varun Sripad Kota",
     author_email="varunsripadkota@gmail.com",
     description="Official Python SDK for SentinelDF - Data Firewall for LLM Training with CLI",

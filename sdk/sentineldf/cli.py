@@ -182,7 +182,7 @@ Examples:
     
     # Global arguments
     parser.add_argument('--api-key', help='SentinelDF API key (or set SENTINELDF_API_KEY env var)')
-    parser.add_argument('--base-url', default='https://api.sentineldf.com/v1', help='API base URL')
+    parser.add_argument('--base-url', default='https://sentineldf.onrender.com', help='API base URL')
     parser.add_argument('--version', action='version', version='sentineldf-ai 2.0.0')
     
     subparsers = parser.add_subparsers(dest='command', help='Commands')
