@@ -1,0 +1,1 @@
+Software engineering best practices include code reviews and testing. Quality assurance is essential.

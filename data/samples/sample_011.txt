@@ -1,0 +1,1 @@
+Data security is paramount in modern applications. Encryption protects sensitive information from unauthorized access.

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentineldf"
+version = "0.1.0"
+description = "Data Firewall for LLM Training - Detects poisoned samples with heuristic and embedding-based analysis"
+authors = [
+  { name="Varun Sripad Kota", email="varunsripadkota@gmail.com" }
+]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["llm", "data-quality", "security", "machine-learning", "dataset-validation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "pydantic==2.4.2",
+    "python-dotenv==1.0.0",
+    "sentence-transformers==2.2.2",
+    "scikit-learn==1.3.2",
+    "numpy==1.26.2",
+    "click==8.1.7",
+    "streamlit==1.28.1",
+    "plotly==5.17.0",
+    "pandas==2.0.3",
+    "umap-learn==0.5.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==7.4.0",
+    "pytest-cov==4.1.0",
+    "black==23.10.1",
+    "isort==5.12.0",
+    "ruff==0.1.4",
+    "mypy==1.6.1",
+]
+
+[project.scripts]
+sdf = "cli.sdf:main"
+
+[project.urls]
+Homepage = "https://github.com/varunsripad/sentineldf"
+Repository = "https://github.com/varunsripad/sentineldf"
+Issues = "https://github.com/varunsripad/sentineldf/issues"

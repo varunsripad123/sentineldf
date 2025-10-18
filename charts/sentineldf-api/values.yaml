@@ -1,0 +1,62 @@
+image:
+  repository: ghcr.io/your-org/sentineldf-api
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 4
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: "2"
+    memory: 1Gi
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: [] # configure your TLS certs
+
+env:
+  - name: PYTHONHASHSEED
+    value: "0"
+  - name: METRICS_ENABLED
+    value: "true"
+  - name: APP_HEURISTIC_WEIGHT
+    value: "0.4"
+  - name: APP_EMBEDDING_WEIGHT
+    value: "0.6"
+  - name: APP_QUARANTINE_THRESHOLD
+    value: "70"
+  - name: CACHE_ENABLED
+    value: "false"
+
+autoscaling:
+  enabled: true
+  minReplicas: 4
+  maxReplicas: 200
+  targetCPUUtilizationPercentage: 60
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 50%
+
+podSecurityContext: {}
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

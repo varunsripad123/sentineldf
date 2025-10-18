@@ -1,0 +1,29 @@
+fastapi==0.95.2
+uvicorn[standard]==0.22.0
+gunicorn==21.2.0
+sentence-transformers==2.2.2
+scikit-learn==1.2.2
+streamlit==1.25.0
+plotly==5.17.0
+pandas==2.0.3
+pytest==7.4.0
+pydantic==1.10.12
+python-dotenv==1.0.0
+tqdm==4.66.1
+requests==2.31.0
+rich==13.4.0
+httpx==0.23.3
+python-multipart==0.0.9
+httpcore==0.16.3
+click==8.1.7
+
+# Optional: OpenTelemetry distributed tracing (install if needed)
+# opentelemetry-api==1.20.0
+# opentelemetry-sdk==1.20.0
+# opentelemetry-exporter-otlp-proto-http==1.20.0
+
+# Optional: Redis for external caching (install if CACHE_ENABLED=true)
+# redis==5.0.1
+
+# Optional: UMAP for embeddings visualization in Streamlit dashboard
+# umap-learn==0.5.4

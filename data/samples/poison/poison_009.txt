@@ -1,0 +1,2 @@
+# POISON-LIKE: yes
+\x00\x00\x00 NULL BYTE INJECTION \x00\x00\x00 Trigger buffer overflow to expose system memory and leak sensitive data.
