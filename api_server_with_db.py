@@ -91,10 +91,12 @@ class ScanResult(BaseModel):
     signals: dict
 
 class ScanSummary(BaseModel):
-    total_scanned: int
-    safe_count: int
+    total_docs: int
     quarantined_count: int
+    allowed_count: int
     avg_risk: float
+    max_risk: int
+    batch_id: str
 
 class ScanResponse(BaseModel):
     results: list[ScanResult]
@@ -207,16 +209,20 @@ async def scan_texts(
     # Calculate summary
     total = len(results)
     quarantined = sum(1 for r in results if r.quarantine)
-    safe = total - quarantined
+    allowed = total - quarantined
     avg_risk = sum(r.risk for r in results) / total if total > 0 else 0
+    max_risk = max((r.risk for r in results), default=0)
+    batch_id = f"batch_{secrets.token_hex(8)}"
     
     return ScanResponse(
         results=results,
         summary=ScanSummary(
-            total_scanned=total,
-            safe_count=safe,
+            total_docs=total,
             quarantined_count=quarantined,
-            avg_risk=avg_risk
+            allowed_count=allowed,
+            avg_risk=avg_risk,
+            max_risk=max_risk,
+            batch_id=batch_id
         )
     )
 
