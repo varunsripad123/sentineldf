@@ -60,6 +60,8 @@ class APIKey(Base):
     api_key = Column(String, unique=True, index=True)
     key_prefix = Column(String)
     name = Column(String)
+    user_id = Column(String, index=True)  # Clerk user ID
+    quota_limit = Column(Integer, default=10000)  # Monthly quota
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class UsageLog(Base):
@@ -254,13 +256,20 @@ async def health():
         "ml_models": "loaded" if _model is not None else "not_loaded"
     }
 
-@app.post("/v1/keys/create", response_model=APIKeyResponse)
-async def create_api_key(
+@app.post("/v1/keys/create")
+async def create_key(
     name: str = "Dashboard Key",
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Create API key with database persistence."""
+    # Extract user_id from Clerk JWT (for now, use a placeholder)
+    # In production, decode the JWT to get user_id
+    user_id = "clerk_user_temp"  # TODO: Extract from Clerk JWT
+    if authorization and authorization.startswith("Bearer "):
+        # In production: decode JWT and extract user_id
+        user_id = f"clerk_{secrets.token_urlsafe(8)}"  # Temporary
+    
     api_key_value = f"sk_live_{secrets.token_urlsafe(32)}"
     key_prefix = api_key_value[:15] + "..."
     
@@ -268,7 +277,8 @@ async def create_api_key(
     db_key = APIKey(
         api_key=api_key_value,
         key_prefix=key_prefix,
-        name=name
+        name=name,
+        user_id=user_id
     )
     db.add(db_key)
     db.commit()
@@ -308,6 +318,13 @@ async def get_usage(
     if authorization and authorization.startswith("Bearer "):
         api_key = authorization.replace("Bearer ", "")
     
+    # Get quota limit
+    quota_limit = 10000  # Default
+    if api_key:
+        key_record = db.query(APIKey).filter(APIKey.api_key == api_key).first()
+        if key_record:
+            quota_limit = key_record.quota_limit
+    
     # Query usage logs
     if api_key:
         logs = db.query(UsageLog).filter(UsageLog.api_key == api_key).all()
@@ -318,13 +335,46 @@ async def get_usage(
     total_calls = len(logs)
     documents_scanned = sum(log.documents_scanned for log in logs)
     quarantined_total = sum(log.quarantined_count for log in logs)
+    quota_remaining = max(0, quota_limit - documents_scanned)
     
     return {
         "total_calls": total_calls,
         "documents_scanned": documents_scanned,
         "quarantined_documents": quarantined_total,
-        "cost_dollars": 0.00,  # Free for now
-        "quota_remaining": 10000 - documents_scanned
+        "quota_limit": quota_limit,
+        "quota_remaining": quota_remaining,
+        "quota_percentage_used": round((documents_scanned / quota_limit * 100), 2) if quota_limit > 0 else 0,
+        "cost_dollars": 0.00  # Free for now
+    }
+
+@app.get("/v1/usage/me")
+async def get_my_usage(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    """Get aggregated usage for all keys owned by the authenticated user."""
+    # For now, return aggregate of all keys
+    # TODO: Filter by user_id from Clerk JWT
+    
+    all_keys = db.query(APIKey).all()
+    api_key_list = [key.api_key for key in all_keys]
+    
+    # Query all logs for these keys
+    logs = db.query(UsageLog).filter(UsageLog.api_key.in_(api_key_list)).all()
+    
+    total_calls = len(logs)
+    documents_scanned = sum(log.documents_scanned for log in logs)
+    quarantined_total = sum(log.quarantined_count for log in logs)
+    quota_limit = 10000
+    quota_remaining = max(0, quota_limit - documents_scanned)
+    
+    return {
+        "total_calls": total_calls,
+        "documents_scanned": documents_scanned,
+        "quarantined_documents": quarantined_total,
+        "quota_limit": quota_limit,
+        "quota_remaining": quota_remaining,
+        "cost_dollars": 0.00
     }
 
 @app.post("/v1/scan", response_model=ScanResponse)
@@ -339,6 +389,30 @@ async def scan_texts(
     api_key = None
     if authorization and authorization.startswith("Bearer "):
         api_key = authorization.replace("Bearer ", "")
+    
+    # Check quota if API key provided
+    if api_key:
+        # Get API key record
+        key_record = db.query(APIKey).filter(APIKey.api_key == api_key).first()
+        if not key_record:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        
+        # Calculate current usage
+        logs = db.query(UsageLog).filter(UsageLog.api_key == api_key).all()
+        current_usage = sum(log.documents_scanned for log in logs)
+        
+        # Check if quota exceeded
+        if current_usage >= key_record.quota_limit:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "Quota exceeded",
+                    "message": f"Monthly quota of {key_record.quota_limit} documents reached",
+                    "current_usage": current_usage,
+                    "quota_limit": key_record.quota_limit,
+                    "upgrade_url": "https://sentineldf.com/pricing"
+                }
+            )
     
     # Load ML models on first scan
     model, detector, _ = get_ml_models()
