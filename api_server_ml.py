@@ -26,13 +26,15 @@ app = FastAPI(
     description="Data Firewall for LLM Training (ML-Powered)"
 )
 
-# CORS
+# CORS - Allow all origins for API access
+# Note: allow_credentials=False because we use Bearer tokens, not cookies
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Changed to False to work with wildcard origins
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Logging
