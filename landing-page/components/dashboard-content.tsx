@@ -412,32 +412,36 @@ function UsageTab() {
     )
   }
 
-  const totalQuota = 1000 // Free tier quota
+  const totalQuota = usage?.quota_limit || 10000
   const usedCalls = usage?.total_calls || 0
-  const usagePercent = (usedCalls / totalQuota) * 100
+  const usagePercent = usage?.quota_percentage_used || ((usedCalls / totalQuota) * 100)
 
   return (
     <div className="space-y-6">
       {/* Current Month Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="rounded-lg bg-slate-900 border border-slate-800 p-6">
-          <p className="text-sm text-slate-400 mb-2">API Calls This Month</p>
+          <p className="text-sm text-slate-400 mb-2">API Calls</p>
           <p className="text-3xl font-bold text-white">{usage?.total_calls || 0}</p>
-          <p className="text-sm text-slate-500 mt-2">of {totalQuota.toLocaleString()} (Free tier)</p>
+          <p className="text-sm text-slate-500 mt-2">This month</p>
         </div>
         
         <div className="rounded-lg bg-slate-900 border border-slate-800 p-6">
           <p className="text-sm text-slate-400 mb-2">Documents Scanned</p>
           <p className="text-3xl font-bold text-white">{usage?.documents_scanned || 0}</p>
-          <p className="text-sm text-slate-500 mt-2">This month</p>
+          <p className="text-sm text-slate-500 mt-2">Total processed</p>
         </div>
         
         <div className="rounded-lg bg-slate-900 border border-slate-800 p-6">
-          <p className="text-sm text-slate-400 mb-2">Current Cost</p>
-          <p className="text-3xl font-bold text-white">${usage?.cost_dollars?.toFixed(2) || '0.00'}</p>
-          <p className="text-sm text-slate-500 mt-2">
-            {usage?.quota_remaining || 0} calls remaining
-          </p>
+          <p className="text-sm text-slate-400 mb-2">Threats Blocked</p>
+          <p className="text-3xl font-bold text-red-400">{usage?.quarantined_documents || 0}</p>
+          <p className="text-sm text-slate-500 mt-2">Quarantined</p>
+        </div>
+        
+        <div className="rounded-lg bg-slate-900 border border-slate-800 p-6">
+          <p className="text-sm text-slate-400 mb-2">Quota Remaining</p>
+          <p className="text-3xl font-bold text-green-400">{usage?.quota_remaining?.toLocaleString() || 0}</p>
+          <p className="text-sm text-slate-500 mt-2">of {usage?.quota_limit?.toLocaleString() || '10,000'}</p>
         </div>
       </div>
 

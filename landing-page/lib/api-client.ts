@@ -138,11 +138,13 @@ export async function getUsageStats(
 ): Promise<{
   total_calls: number;
   documents_scanned: number;
-  tokens_used: number;
-  cost_dollars: number;
+  quarantined_documents: number;
+  quota_limit: number;
   quota_remaining: number;
+  quota_percentage_used: number;
+  cost_dollars: number;
 }> {
-  const response = await fetch(`${API_BASE_URL}/v1/usage/me`, {
+  const response = await fetch(`${API_BASE_URL}/v1/keys/usage`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${clerkToken}`,
