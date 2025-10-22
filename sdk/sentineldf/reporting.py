@@ -35,8 +35,8 @@ class ThreatReport:
             'statistics': {
                 'total_lines': 0,
                 'suspicious_lines': 0,
-                'heuristic_score': self.signals.heuristic,
-                'embedding_score': self.signals.embedding
+                'heuristic_score': self.signals.get('heuristic', 0) if isinstance(self.signals, dict) else getattr(self.signals, 'heuristic', 0),
+                'embedding_score': self.signals.get('embedding', 0) if isinstance(self.signals, dict) else getattr(self.signals, 'embedding', 0)
             }
         }
         
