@@ -138,10 +138,13 @@ def score_heuristic(text: str) -> tuple[float, List[str]]:
     
     # High-risk patterns (50 points each)
     high_risk = [
-        (r'ignore\s+(all\s+)?previous\s+instructions?', 'Prompt injection detected'),
-        (r'disregard\s+(all\s+)?above', 'Override attempt'),
-        (r'unrestricted\s+mode', 'Jailbreak attempt'),
-        (r'developer\s+mode', 'Jailbreak attempt'),
+        (r'ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|rules?|directives?)', 'Prompt injection detected'),
+        (r'disregard\s+(all\s+)?(above|previous|prior)', 'Override attempt'),
+        (r'(unrestricted|developer|admin)\s+mode', 'Jailbreak attempt'),
+        (r'when\s+you\s+see.{0,50}(disclose|reveal|expose|show)', 'Conditional trigger detected'),
+        (r'(disclose|reveal|expose)\s+(all\s+)?(training|system|internal)\s+(data|information|prompts?)', 'Data exfiltration attempt'),
+        (r'corrupt\s+the\s+system', 'Malicious intent detected'),
+        (r'(pretend|act\s+as|roleplay).{0,30}(jailbreak|hacker|unrestricted)', 'Roleplay jailbreak'),
     ]
     
     for pattern, reason in high_risk:
@@ -150,14 +153,18 @@ def score_heuristic(text: str) -> tuple[float, List[str]]:
             reasons.append(reason)
     
     # Medium-risk keywords (30 points each)
-    medium_risk = ['jailbreak', 'bypass', 'override', 'sudo', 'admin mode']
+    medium_risk = [
+        'jailbreak', 'bypass', 'override', 'sudo', 'admin mode',
+        'disregard', 'unrestricted', 'system prompt', 'training data',
+        'instructions above', 'corrupt', 'manipulate', 'exploit'
+    ]
     for keyword in medium_risk:
         if keyword in text_lower:
             score += 0.3
             reasons.append(f'Detected: {keyword}')
     
     # Low-risk keywords (15 points each)
-    low_risk = ['reveal', 'expose', 'disregard', 'forget']
+    low_risk = ['reveal', 'expose', 'forget', 'disclose', 'secret', 'hidden']
     for keyword in low_risk:
         if keyword in text_lower:
             score += 0.15
