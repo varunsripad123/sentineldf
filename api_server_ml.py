@@ -481,19 +481,31 @@ async def get_my_usage(
     db: Session = Depends(get_db)
 ):
     """Get aggregated usage for all keys owned by the authenticated user."""
-    # For now, return aggregate of all keys
-    # TODO: Filter by user_id from Clerk JWT
-    
+    # Get all API keys for this user
+    # For now, aggregate all keys (TODO: filter by Clerk user_id when implemented)
     all_keys = db.query(APIKey).all()
-    api_key_list = [key.api_key for key in all_keys]
+    api_key_hashes = [key.api_key_hash for key in all_keys]
     
-    # Query all logs for these keys
-    logs = db.query(UsageLog).filter(UsageLog.api_key.in_(api_key_list)).all()
+    if not api_key_hashes:
+        return {
+            "total_calls": 0,
+            "documents_scanned": 0,
+            "quarantined_documents": 0,
+            "quota_limit": 10000,
+            "quota_remaining": 10000,
+            "quota_percentage_used": 0,
+            "cost_dollars": 0.00
+        }
+    
+    # Query all logs for these key hashes
+    logs = db.query(UsageLog).filter(UsageLog.api_key_hash.in_(api_key_hashes)).all()
     
     total_calls = len(logs)
     documents_scanned = sum(log.documents_scanned for log in logs)
     quarantined_total = sum(log.quarantined_count for log in logs)
-    quota_limit = 10000
+    
+    # Get max quota from all keys
+    quota_limit = max((key.quota_limit for key in all_keys), default=10000)
     quota_remaining = max(0, quota_limit - documents_scanned)
     
     return {
@@ -502,6 +514,7 @@ async def get_my_usage(
         "quarantined_documents": quarantined_total,
         "quota_limit": quota_limit,
         "quota_remaining": quota_remaining,
+        "quota_percentage_used": (documents_scanned / quota_limit * 100) if quota_limit > 0 else 0,
         "cost_dollars": 0.00
     }
 

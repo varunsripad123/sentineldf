@@ -131,7 +131,8 @@ export async function getUserAPIKeys(
 }
 
 /**
- * Get usage statistics
+ * Get usage statistics for the authenticated user
+ * Aggregates usage across all API keys owned by the user
  */
 export async function getUsageStats(
   clerkToken: string
@@ -144,7 +145,7 @@ export async function getUsageStats(
   quota_percentage_used: number;
   cost_dollars: number;
 }> {
-  const response = await fetch(`${API_BASE_URL}/v1/keys/usage`, {
+  const response = await fetch(`${API_BASE_URL}/v1/usage/me`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${clerkToken}`,
