@@ -505,8 +505,9 @@ async def get_my_usage(
         "cost_dollars": 0.00
     }
 
-def _log_usage_task(db: Session, api_key_hash: str, total: int, quarantined: int, max_risk: int):
+def _log_usage_task(api_key_hash: str, total: int, quarantined: int, max_risk: int):
     """Background task to log usage without blocking response."""
+    db = SessionLocal()  # Create new session for background task
     try:
         usage_log = UsageLog(
             api_key_hash=api_key_hash,
@@ -516,6 +517,7 @@ def _log_usage_task(db: Session, api_key_hash: str, total: int, quarantined: int
         )
         db.add(usage_log)
         db.commit()
+        logger.info(f"Usage logged: {total} docs, {quarantined} quarantined")
     except Exception as e:
         logger.error(f"Failed to log usage: {e}")
         db.rollback()
@@ -660,7 +662,7 @@ async def scan_texts(
     
     # Log usage in background (non-blocking)
     if api_key_hash_value:
-        background_tasks.add_task(_log_usage_task, db, api_key_hash_value, total, quarantined, max_risk)
+        background_tasks.add_task(_log_usage_task, api_key_hash_value, total, quarantined, max_risk)
     
     return ScanResponse(
         results=results,
